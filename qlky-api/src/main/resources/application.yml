@@ -1,0 +1,52 @@
+spring:
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 200MB
+  main:
+    web-application-type: servlet
+  web:
+    resources:
+      cache:
+        use-last-modified: true
+        period: 3600
+        cache-control:
+          max-age: 7200
+      static-locations:
+        - "classpath:/static"
+        - "file:/www/wwwroot/maskmanger/static/file"
+        - "file:///D:/code/qlky-project/file"
+      add-mappings: true
+  profiles:
+    active: dev
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+    hiddenmethod:
+      filter:
+        enabled: true
+    static-path-pattern: "/data/**"
+  config:
+    import:
+      - classpath:private.yml
+      - classpath:swagger.yml
+  application:
+    name: QLKY
+server:
+  port: 9997
+
+logging:
+  pattern:
+    dateformat: mm:ss.SSS
+  level:
+    com: debug
+
+mybatis-plus:
+  type-aliases-package: com.aliax.qlky.entity
+  mapper-locations: classpath*:com/aliax/qlky/mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+  global-config:
+    db-config:
+      id-type: assign_id

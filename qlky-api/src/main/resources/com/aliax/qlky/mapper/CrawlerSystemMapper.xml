@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aliax.qlky.mapper.CrawlerSystemMapper">
+
+    <select id="selectWithCrawlerName" resultType="com.aliax.qlky.entity.CrawlerSystemEntity">
+        SELECT
+            cs.*, c.crawler_name
+        FROM crawler_system cs
+        LEFT JOIN crawler c ON cs.crawler_id = c.crawler_id
+        <where>
+            <if test="crawlerId != null">
+                and cs.crawler_id = #{crawlerId}
+            </if>
+            <if test="crawlerName != null and crawlerName != ''">
+                and c.crawler_name LIKE CONCAT('%', #{crawlerName}, '%')
+            </if>
+        </where>
+        ORDER BY cs.created_at DESC
+    </select>
+</mapper>

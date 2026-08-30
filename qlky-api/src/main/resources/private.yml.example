@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    url: "${QLKY_DB_URL:jdbc:mysql://127.0.0.1:3306/qlky?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai}"
+    username: "${QLKY_DB_USERNAME}"
+    password: "${QLKY_DB_PASSWORD}"
+    driver-class-name: "${QLKY_DB_DRIVER:com.mysql.cj.jdbc.Driver}"
+    hikari:
+      maximum-pool-size: 20

@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aliax.qlky.mapper.CrawlerDataMapper">
+
+
+    <select id="selectMapByGroupId" resultType="String">
+        SELECT DISTINCT group_id
+        FROM crawler_data
+        WHERE crawler_id = #{crawlerId}
+        LIMIT #{offset} , #{pageSize}
+    </select>
+
+    <select id="countMapByGroupId" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT group_id)
+        FROM crawler_data
+        WHERE crawler_id = #{crawlerId}
+    </select>
+
+    <select id="selectCrawlerDataByQueryMap" resultType="java.util.Map">
+        SELECT
+        JSON_MERGE_PATCH(
+            JSON_OBJECT('group_id', cd.group_id),
+            JSON_OBJECTAGG(cdf.field_name, cd.data)
+        ) AS field_map
+        FROM
+        crawler_data cd
+        LEFT JOIN
+        crawler_data_field cdf ON cdf.field_id = cd.fieldid
+        <where>
+            <if test="@org.apache.commons.collections4.MapUtils@isNotEmpty(_parameter)">
+                <!-- 遍历传入的 Map -->
+                <foreach collection="_parameter.entrySet()" index="key" item="value">
+                    <if test="key != 'index' and key != 'len' and key != 'crawlerId'">
+                        <choose>
+                            <!-- 处理时间范围：start -->
+                            <when test="key == 'start'">
+                                AND cd.created_at >= #{value}
+                            </when>
+                            <!-- 处理时间范围：end -->
+                            <when test="key == 'end'">
+                                AND cd.created_at &lt; #{value}
+                            </when>
+                            <!-- 处理其他字段条件 -->
+                            <otherwise>
+                                AND EXISTS (
+                                SELECT 1
+                                FROM crawler_data cd_sub
+                                INNER JOIN crawler_data_field cdf_sub
+                                ON cd_sub.fieldid = cdf_sub.field_id
+                                WHERE
+                                cd_sub.group_id = cd.group_id
+                                AND cdf_sub.field_name = #{key}
+                                AND cd_sub.data = #{value}
+                                )
+                            </otherwise>
+                        </choose>
+                    </if>
+                </foreach>
+            </if>
+            <if test="crawlerId != null">
+                AND cd.crawler_id = #{crawlerId}
+            </if>
+        </where>
+        GROUP BY
+        cd.group_id
+        <if test="index != null">
+            LIMIT #{len}, #{index};
+        </if>
+    </select>
+
+    <select id="countCrawlerDataByQueryMap" resultType="java.lang.Integer">
+        SELECT
+        count(DISTINCT cd.group_id)
+        FROM
+        crawler_data cd
+        LEFT JOIN
+        crawler_data_field cdf ON cdf.field_id = cd.fieldid
+        <where>
+            <if test="@org.apache.commons.collections4.MapUtils@isNotEmpty(_parameter)">
+                <!-- 遍历传入的 Map -->
+                <foreach collection="_parameter.entrySet()" index="key" item="value">
+                    <if test="key != 'index' and key != 'len' and key != 'crawlerId'">
+                        <choose>
+                            <!-- 处理时间范围：start -->
+                            <when test="key == 'start'">
+                                AND cd.created_at >= #{value}
+                            </when>
+                            <!-- 处理时间范围：end -->
+                            <when test="key == 'end'">
+                                AND cd.created_at &lt; #{value}
+                            </when>
+                            <!-- 处理其他字段条件 -->
+                            <otherwise>
+                                AND EXISTS (
+                                SELECT 1
+                                FROM crawler_data cd_sub
+                                INNER JOIN crawler_data_field cdf_sub
+                                ON cd_sub.fieldid = cdf_sub.field_id
+                                WHERE
+                                cd_sub.group_id = cd.group_id
+                                AND cdf_sub.field_name = #{key}
+                                AND cd_sub.data = #{value}
+                                )
+                            </otherwise>
+                        </choose>
+                    </if>
+                </foreach>
+            </if>
+            <if test="crawlerId != null">
+                AND cd.crawler_id = #{crawlerId}
+            </if>
+        </where>
+    </select>
+
+    <select id="countMoreCrawlerDataByQueryMap" resultType="map">
+        SELECT
+        <trim suffixOverrides=",">
+            <!-- 动态生成统计字段（排除 query/start/end/） -->
+            <foreach item="entry" index="field" collection="_parameter.entrySet()">
+                <if test="field != 'query' and field != 'start' and field != 'end' and entry.value != null">
+                    <foreach item="value" collection="entry.value">
+                        SUM(
+                        IF(
+                        cdf.field_name = #{field} AND cd.data = #{value},
+                        1,
+                        0
+                        )
+                        ) AS `${field}_${value}`,
+                    </foreach>
+                </if>
+            </foreach>
+        </trim>
+        FROM
+        crawler_data cd
+        INNER JOIN
+        crawler_data_field cdf ON cdf.field_id = cd.fieldid
+        <where>
+            <!-- 处理时间范围 -->
+            <if test="start != null">
+                AND cd.created_at >= #{start}
+            </if>
+            <if test="end != null">
+                AND cd.created_at &lt; #{end}
+            </if>
+            <!-- 处理动态查询条件（query 列表） -->
+            <if test="query != null and !query.isEmpty()">
+                <foreach item="condition" collection="query">
+                    AND (
+                    <!-- 遍历条件中的键值对 -->
+                    <foreach item="condEntry" index="condField" collection="condition.entrySet()">
+                        <choose>
+                            <!-- 处理标准格式 {field: 'name', value: 'value'} -->
+                            <when test="condEntry.key == 'field' or condEntry.key == 'value'">
+                                cdf.field_name = #{condition.field}
+                                AND cd.data = #{condition.value}
+                            </when>
+                            <!-- 处理简写格式 {status: 1} -->
+                            <otherwise>
+                                cdf.field_name = #{condField}
+                                AND cd.data = #{condEntry}
+                            </otherwise>
+                        </choose>
+                    </foreach>
+                    )
+                </foreach>
+            </if>
+            <if test="crawlerId != null">
+                AND cd.crawler_id = #{crawlerId}
+            </if>
+        </where>
+    </select>
+    <select id="findNonExistingGroupIds" resultType="java.lang.String">
+        SELECT temp.group_id
+        FROM (
+        <foreach collection="inputList" item="groupid" separator=" UNION ALL ">
+            SELECT #{groupid} AS group_id FROM DUAL
+        </foreach>
+        ) temp
+        LEFT JOIN crawler_data cd ON temp.group_id = cd.group_id
+        WHERE cd.group_id IS NULL
+    </select>
+</mapper>
